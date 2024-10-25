@@ -1,2 +1,2 @@
 # Send-email
-EMIAL DE EMAIL EM MASSA USANDO PLANILHAS GOOGLE 
+Envio de email usando Apps Script no google sheets 
