@@ -1,0 +1,154 @@
+var ss_id = "10WwFyzIWdTbqz2_dqpyUof3yDVqBmMPNHDxlhHwAnoQ";//Atualize com ID da sua  planilha..
+var sheetName = "SEND EMAIL STAR"; // Nome da planilha
+var dueDateCell = "C2"; // A célula que indica a data de hoje.
+var startRow = 6; // Primeira linha após seu cabeçalho.
+var reminderColStart = 6; // Em que linha o lembrete começa.
+
+var mailApp = MailApp;
+
+// Email data
+var subject = "CONFIRME SUA PROGRAMAÇÃO : "; // O assunto do e-mail
+
+/******************************************************************************************
+ * A função de execução principal. Ele percorre cada usuário e chama a seguinte função:
+ *   - sendEmail()
+ *   - openCompleteWindow()
+ */
+function main() {
+  var ss = SpreadsheetApp.openById(ss_id);
+  var sheet = ss.getSheetByName(sheetName);
+  
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  
+  var dueDate = sheet.getRange(dueDateCell).getValue();
+  dueDate = Utilities.formatDate(dueDate, "GMT+7", "EEE, dd MMM yyyy");
+  
+  var range = sheet.getRange(startRow, 1, lastRow - startRow + 1, lastCol); 
+  var rangeVals = range.getValues();
+  
+  var badEmailList = [];
+  var reminder = [];
+  
+  // Loop pelos valores do intervalo. Se a caixa de seleção não estiver marcada, continue.
+  for (var row = 0; row < rangeVals.length; row++) {
+    if (!rangeVals[row][2]) {  // Coluna 3 é a checkbox, se não marcada, envia e-mail
+      var badEmail = sendEmail(rangeVals[row], ss.getUrl(), dueDate);
+
+      // Atualiza a coluna F(5) do Lembrete enviado e a coluna G(6) da data do último lembrete;
+      if (!badEmail) {
+        rangeVals[row][5] += 1;
+        rangeVals[row][6] = new Date();
+      } else {
+        badEmailList.push(badEmail);
+      }
+    }
+    reminder.push([rangeVals[row][5], rangeVals[row][6]]);
+  }
+  
+  var reminderRange = sheet.getRange(startRow, reminderColStart, lastRow - startRow + 1, 2);
+  reminderRange.setValues(reminder);
+  
+  openCompleteWindow(badEmailList);
+}
+
+/******************************************************************************************
+ * Google função de gatilho. Quando a planilha é aberta, um menu personalizado é produzido.
+ */
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu("COTAS DE ENVIO")
+    .addItem("VER COTAS PARA ENVIO", "getQuota")
+    .addToUi();
+}
+
+/******************************************************************************************
+ * Envia e-mail HTML para o usuário que não concluiu a tarefa. 
+ * O modelo HTML é criado a partir do arquivo email.html. 
+ *
+ * @param {array} overDueStaff - matriz 2d de funcionários atrasados ​​com dados de linha completos.
+ * @param {string} sheetURL - url da planilha atual.
+ * @param {date} dateDue - data formatada.
+ *
+ * @return {array} - Retorna um array de endereços de e-mail que não puderam ser tentados devido a erros.
+ */
+function sendEmail(overDueStaff, sheetURL, dateDue) {
+  var staff = {
+    "name": overDueStaff[0],
+    "email": overDueStaff[1],
+    "manha": overDueStaff[7],
+    "amount": overDueStaff[8],
+    "clientName": overDueStaff[10],
+    "turno": overDueStaff[11],  
+    "andress": overDueStaff[9],
+    "dueDate": dateDue,
+    "daysOverdue": overDueStaff[4]
+  };
+  staff.daysOverdue = (staff.daysOverdue > 1) ? staff.daysOverdue + " days" : staff.daysOverdue + " day";
+
+  var subj = subject;  // subject1 não é necessário, removido para simplificação
+
+  var body = HtmlService.createTemplateFromFile("email");
+  body.name = staff.name;
+  body.due = staff.dueDate;
+  body.overdue = staff.daysOverdue;
+  body.manha = staff.manha;
+  body.amount = staff.amount;
+  body.clientName = staff.clientName;
+  body.andress = staff.andress;
+  body.turno = staff.turno;
+  body.reportName = sheetName;
+
+  try {
+    Utilities.sleep(2000);  // Pausa para evitar problemas com excesso de chamadas
+    SpreadsheetApp.getActive().toast(staff.name, "Mensagem enviada para:");
+    MailApp.sendEmail({
+      to: staff.email,
+      subject: subj,
+      htmlBody: body.evaluate().getContent(),
+    });
+  } catch (error) {
+    Logger.log("Erro ao enviar email para: " + staff.email + " - " + error.message);
+    return staff.email;
+  }
+}
+
+/******************************************************************************************
+ * Abre um alerta de conclusão assim que o script é executado com uma lista de emails que não puderam ser enviados.
+ *
+ * @param {string} badEmailList - array de endereços de e-mail que não puderam ser tentados devido a erros.
+ */
+function openCompleteWindow(badEmailList) {
+  SpreadsheetApp.getUi().alert(
+    "E-mails enviados com sucesso!\n\n" +
+    "E-mails não enviados ficaram listados \n aqui abaixo:\n" +
+    badEmailList.join("\n")
+  );
+}
+
+/******************************************************************************************
+ * Função para controlar a edição e replicar o valor da célula C4 na coluna C da planilha
+ */
+function onEdit() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  var cell = sheet.getActiveCell();
+  var row = cell.getRow();
+  var col = cell.getColumn();
+  var check02 = cell.getValue();
+  var lastRow = sheet.getLastRow();
+  
+  if (row == 4 && col == 3) {
+    sheet.getRange("C6:C" + lastRow).setValue(check02);
+  }
+}
+
+/******************************************************************************************
+ * Exibe a cota de e-mails restantes do MailApp
+ */
+function getQuota() {
+  var emailQuotaRemaining = MailApp.getRemainingDailyQuota();
+  SpreadsheetApp.getUi().alert(
+    "Você contém: " + emailQuotaRemaining + " envios restantes"
+  );
+}
