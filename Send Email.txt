@@ -1,4 +1,4 @@
-var ss_id = "10WwFyzIWdTbqz2_dqpyUof3yDVqBmMPNHDxlhHwAnoQ";//Atualize com ID da sua  planilha..
+var ss_id = "id da dua planilha";//Atualize com ID da sua  planilha..
 var sheetName = "SEND EMAIL STAR"; // Nome da planilha
 var dueDateCell = "C2"; // A célula que indica a data de hoje.
 var startRow = 6; // Primeira linha após seu cabeçalho.
